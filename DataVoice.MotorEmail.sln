@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataVoice.MotorEmail.Entida
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataVoice.MotorEmail.Models", "DataVoice.MotorEmail.Models\DataVoice.MotorEmail.Models.csproj", "{CB43A10A-C998-4EF1-8F0D-97993EDA525F}"
 EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "DataVoice.MotorEmail.Setup", "DataVoice.MotorEmail.Setup\DataVoice.MotorEmail.Setup.vdproj", "{B0EE776C-9A6E-446C-B017-5864304D381D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -145,6 +147,21 @@ Global
 		{CB43A10A-C998-4EF1-8F0D-97993EDA525F}.Trial|Mixed Platforms.Build.0 = Debug|Any CPU
 		{CB43A10A-C998-4EF1-8F0D-97993EDA525F}.Trial|x86.ActiveCfg = Debug|Any CPU
 		{CB43A10A-C998-4EF1-8F0D-97993EDA525F}.Trial|x86.Build.0 = Debug|Any CPU
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Debug|Any CPU.ActiveCfg = Debug
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Debug|Mixed Platforms.ActiveCfg = Debug
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Debug|x86.ActiveCfg = Debug
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.MailSystem Dev|Any CPU.ActiveCfg = Debug
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.MailSystem Dev|Mixed Platforms.ActiveCfg = Debug
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.MailSystem Dev|x86.ActiveCfg = Debug
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Release|Any CPU.ActiveCfg = Release
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Release|Mixed Platforms.ActiveCfg = Release
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Release|x86.ActiveCfg = Release
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Retail|Any CPU.ActiveCfg = Release
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Retail|Mixed Platforms.ActiveCfg = Release
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Retail|x86.ActiveCfg = Release
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Trial|Any CPU.ActiveCfg = Debug
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Trial|Mixed Platforms.ActiveCfg = Debug
+		{B0EE776C-9A6E-446C-B017-5864304D381D}.Trial|x86.ActiveCfg = Debug
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

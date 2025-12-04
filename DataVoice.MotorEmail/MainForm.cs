@@ -1,27 +1,28 @@
-﻿using System;
+﻿using DataVoice.MotorEmail.Models;
+using DataVoice.MotorEmail.Negocio;
+using EAGetMail;
+using Microsoft.Identity.Client;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
-using System.Windows.Forms;
-using System.IO;
 using System.Configuration;
-using System.Threading;
-using System.Text.RegularExpressions;
-using System.Net;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Data;
 using System.Diagnostics;
-using Microsoft.Identity.Client;
-using EAGetMail;
-using System.Runtime.InteropServices;
-using System.Net.Sockets;
+using System.Drawing;
 using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Net.Http.Json;
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Security;
-using DataVoice.MotorEmail.Models;
-using DataVoice.MotorEmail.Negocio;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace DataVoice.MotorEmail
 {
@@ -610,9 +611,14 @@ namespace DataVoice.MotorEmail
 
         public async Task ObtenerCorreos()
         {
+            MailClient oClient = null;
+            MailServer oServer = null;
+            CuentasEmail cuenta = null;
+
             DateTime start = DateTime.Now;
             try
             {
+               
                 this.Invoke(new MethodInvoker(delegate { LblTemporizador.Text = "Procesando"; }));
                 this.Invoke(new MethodInvoker(delegate { LblMensaje.Text = ""; }));
                 string LicenseCodeEAGetMail = ConfigurationManager.AppSettings["LicenseCodeEAGetMail"];
@@ -624,9 +630,10 @@ namespace DataVoice.MotorEmail
                 {
                     if (nodo.Checked)
                     {
-                        MailServer oServer;
+                        //MailServer oServer;
                         //EmailAccounts cuenta = CurrentMailAccounts.Find(seleccion => seleccion.UserName == nodo.Text);
-                        CuentasEmail cuenta = cuentas.Where(seleccion => seleccion.UserName == nodo.Text).FirstOrDefault();
+                        //CuentasEmail cuenta = cuentas.Where(seleccion => seleccion.UserName == nodo.Text).FirstOrDefault();
+                        cuenta = cuentas.Where(seleccion => seleccion.UserName == nodo.Text).FirstOrDefault();
                         _NumeroEmail = cuenta.UltimoIndice;
                         if (cuenta.Oauth2)
                         {
@@ -638,7 +645,8 @@ namespace DataVoice.MotorEmail
                         }
 
 
-                        MailClient oClient = new MailClient(LicenseCodeEAGetMail);
+                        //MailClient oClient = new MailClient(LicenseCodeEAGetMail);
+                        oClient = new MailClient(LicenseCodeEAGetMail);
                         // Get new email only, if you want to get all emails, please remove this line
                         oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.NewOnly;
 
@@ -648,6 +656,27 @@ namespace DataVoice.MotorEmail
                         MailInfo[] emails = oClient.GetMailInfos();
                         Console.WriteLine("Total {0} email(s)\r\n", emails.Length);
                         this.Invoke(new MethodInvoker(delegate { TxtNumeroCorreo.Text = emails.Length.ToString(); }));
+
+                        //oClient.Connect(oServer);
+
+                        //Imap4Folder[] folders = oClient.GetFolders();
+                        //Imap4Folder inboxFolder = folders.FirstOrDefault(f => f.Name.Equals("INBOX", StringComparison.OrdinalIgnoreCase));
+                        //oClient.SelectFolder(inboxFolder);
+                        //oClient.GetMailInfosParam.Reset();
+
+                        //int totalCount = oClient.GetMailCount();
+                        //int recentCount = Math.Min(500, totalCount);
+                        ////int startSeq = Math.Max(1, totalCount - recentCount + 1);
+                        ////oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.SeqRange;
+                        ////oClient.GetMailInfosParam.SeqRange = $"{startSeq}:*";
+
+                        //// Filtra con IMAP SEARCH
+                        //oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.DateRange;
+                        //DateTime startDate = DateTime.Now.AddDays(-5);
+                        //oClient.GetMailInfosParam.DateRange.SINCE = startDate;
+
+
+                        //MailInfo[] emails = oClient.GetMailInfos();
 
                         int total = emails.Length;
                         string path = ConfigurationManager.AppSettings["UbicacionArchivos"];
@@ -878,6 +907,13 @@ namespace DataVoice.MotorEmail
                             catch (Exception ex)
                             {
                                 oClient.Quit();
+                                string usuarioError = cuenta?.UserName ?? "Desconocido";
+                                string servidorError = oServer?.Server ?? "Desconocido";
+
+                                // Solo enviamos a la API
+                                await SendErrorToAPI(ex, usuarioError, servidorError);
+                              
+                               
                                 await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), ex.Message.ToString());
                                 Thread.Sleep(5000);
                             }
@@ -890,6 +926,11 @@ namespace DataVoice.MotorEmail
             }
             catch (Exception ex)
             {
+                oClient.Quit();
+                string usuarioError = cuenta?.UserName ?? "Desconocido";
+                string servidorError = oServer?.Server ?? "Desconocido";
+                await SendErrorToAPI(ex, usuarioError, servidorError);
+
                 await saveLOGAsync("Admin", DateTime.Now.ToString("ddMMyyyy"), ex.Message.ToString()+"_"+ ex.StackTrace + "_" + ex.ToString());
                 this.Invoke(new MethodInvoker(delegate { BtnBajarCorreos.Enabled = true; }));
                 this.Invoke(new MethodInvoker(delegate { LblMensaje.Text = "Error: " + ex.Message.ToString(); }));
@@ -900,12 +941,13 @@ namespace DataVoice.MotorEmail
             }
             finally
             {
+                
                 _Temporizador = Convert.ToInt32(ConfigurationManager.AppSettings["TiempoTimerEmail"]);
                 Temporizador.Start();
                 this.Invoke(new MethodInvoker(delegate { LblMensaje.Text = "La Tarea fue Completada. Fecha Fin " + DateTime.Now + " "; }));
                 this.Invoke(new MethodInvoker(delegate { BtnBajarCorreos.Enabled = true; }));
             }
-
+           
             TimeSpan duration = DateTime.Now - start;
             //aquí podríamos devolver información de utilidad, como el resultado de un cálculo,
             //número de elementos afectados, etc.. de manera sencilla y segura
@@ -962,6 +1004,54 @@ namespace DataVoice.MotorEmail
                 }
 
                 throw;
+            }
+        }
+        private async Task SendErrorToAPI(Exception ex, string cuentaCorreo, string servidor, string sitio = "ObtenerCorreos")
+        {
+            try
+            {
+                using (HttpClient client = new HttpClient())
+                {
+                    //var payload = new
+                    //{
+                    //    Usuario = cuentaCorreo ?? "Desconocido",
+                    //    Cuenta = cuentaCorreo ?? "Desconocido",
+                    //    Servidor = servidor ?? "Desconocido",
+                    //    Accion = ex.Message + " | " + ex.StackTrace,
+                    //    Sitio = sitio,
+                    //    Ip = Environment.MachineName
+                    //};
+                    var payload = new
+                    {
+                        usuario = cuentaCorreo ?? "Desconocido",
+                        error = ex.Message + " | " + ex.StackTrace + " | " + servidor ?? "Desconocido",
+                        accion = "Error en la tarea MOTOR DE CORREOS", // opcional
+                        sitio = sitio,
+                        ip = Environment.MachineName
+                    };
+
+                    // Consumir la API
+                    var response = await client.PostAsJsonAsync(
+                        "https://appt.datavoice.com.mx/APIErrorMotores/api/ApiErrorNotifier",
+                        payload
+                    );
+
+                    //                    var response = await client.PostAsJsonAsync(
+                    //"http://localhost:29139/api/ApiErrorNotifier",
+                    //                       payload
+                    //                   );
+
+                    // Opcional: revisar si la API respondió OK
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine($"Error enviando log a la API: {response.StatusCode}");
+                    }
+                }
+            }
+            catch (Exception apiEx)
+            {
+                // Evitar que falle el envío de log
+                Console.WriteLine($"Error en SendErrorToAPI: {apiEx.Message}");
             }
         }
 

@@ -608,12 +608,27 @@ namespace DataVoice.MotorEmail
 
         }
 
+        
 
-        public async Task ObtenerCorreos()
+private static string LimpiarEmojis(string texto)
+    {
+        if (string.IsNullOrEmpty(texto))
+            return texto;
+
+        // Elimina caracteres Unicode fuera de BMP (emojis)
+        return Regex.Replace(
+            texto,
+            @"[\uD800-\uDBFF][\uDC00-\uDFFF]",
+            ""
+        );
+    }
+
+    public async Task ObtenerCorreos()
         {
             MailClient oClient = null;
             MailServer oServer = null;
             CuentasEmail cuenta = null;
+            DateTime? fechaMasReciente = null;
 
             DateTime start = DateTime.Now;
             try
@@ -648,48 +663,142 @@ namespace DataVoice.MotorEmail
                         //MailClient oClient = new MailClient(LicenseCodeEAGetMail);
                         oClient = new MailClient(LicenseCodeEAGetMail);
                         // Get new email only, if you want to get all emails, please remove this line
-                        oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.NewOnly;
+                       // oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.NewOnly;
 
                         Console.WriteLine("Connecting {0} ...", oServer.Server);
                         oClient.Connect(oServer);
 
-                        MailInfo[] emails = oClient.GetMailInfos();
-                        Console.WriteLine("Total {0} email(s)\r\n", emails.Length);
-                        this.Invoke(new MethodInvoker(delegate { TxtNumeroCorreo.Text = emails.Length.ToString(); }));
+
+
+
+
+                        // MailInfo[] emails = oClient.GetMailInfos();
+                        // Console.WriteLine("Total {0} email(s)\r\n", emails.Length);
+                        // this.Invoke(new MethodInvoker(delegate { TxtNumeroCorreo.Text = emails.Length.ToString(); }));
 
                         //oClient.Connect(oServer);
-
-                        //Imap4Folder[] folders = oClient.GetFolders();
-                        //Imap4Folder inboxFolder = folders.FirstOrDefault(f => f.Name.Equals("INBOX", StringComparison.OrdinalIgnoreCase));
-                        //oClient.SelectFolder(inboxFolder);
-                        //oClient.GetMailInfosParam.Reset();
-
-                        //int totalCount = oClient.GetMailCount();
-                        //int recentCount = Math.Min(500, totalCount);
-                        ////int startSeq = Math.Max(1, totalCount - recentCount + 1);
-                        ////oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.SeqRange;
-                        ////oClient.GetMailInfosParam.SeqRange = $"{startSeq}:*";
-
-                        //// Filtra con IMAP SEARCH
-                        //oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.DateRange;
-                        //DateTime startDate = DateTime.Now.AddDays(-5);
-                        //oClient.GetMailInfosParam.DateRange.SINCE = startDate;
-
-
+                        //MailInfo[] emails;
                         //MailInfo[] emails = oClient.GetMailInfos();
 
-                        int total = emails.Length;
-                        string path = ConfigurationManager.AppSettings["UbicacionArchivos"];
-                        if (total < _NumeroEmail)
+                        bool isImap = (oServer.Protocol == ServerProtocol.Imap4);
+                        DateTime fechaFiltro;
+
+                        if (cuenta.FechaUltimoRegistro == null || cuenta.FechaUltimoRegistro == DateTime.MinValue)
                         {
-                            _NumeroEmail = _NumeroEmail - total;
+                            fechaFiltro = DateTime.Now.AddDays(-5);
+                        }
+                        else
+                        {
+
+                            fechaFiltro = cuenta.FechaUltimoRegistro.Value.AddSeconds(-1);
+
                         }
 
-                        for (int numeroCorreo = _NumeroEmail; numeroCorreo < emails.Length; numeroCorreo++)
+                        MailInfo[] emails = null;
+
+                        if (isImap)
+                        {
+                            Imap4Folder[] folders = oClient.GetFolders();
+                            Imap4Folder inboxFolder = folders
+                                .FirstOrDefault(f => f.Name.Equals("INBOX", StringComparison.OrdinalIgnoreCase));
+
+                            oClient.SelectFolder(inboxFolder);
+
+                          
+                            oClient.GetMailInfosParam.Reset();
+                            oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.DateRange;
+                            oClient.GetMailInfosParam.DateRange.SINCE = fechaFiltro;
+
+                            emails = oClient.GetMailInfos();
+                        }
+                        else
+                        {
+                       
+                            var todos = oClient.GetMailInfos();
+                            List<MailInfo> filtrados = new List<MailInfo>();
+
+                            foreach (var info in todos)
+                            {
+                                Mail m = oClient.GetMail(info);
+
+                                if (m.ReceivedDate >= fechaFiltro)
+                                    filtrados.Add(info);
+                            }
+
+                            emails = filtrados.ToArray();
+                        }
+
+                        //if (isImap)
+                        //{
+                        //    Imap4Folder[] folders = oClient.GetFolders();
+                        //    Imap4Folder inboxFolder = folders.FirstOrDefault(f => f.Name.Equals("INBOX", StringComparison.OrdinalIgnoreCase));
+                        //    oClient.SelectFolder(inboxFolder);
+                        //    oClient.GetMailInfosParam.Reset();
+
+
+                        //    ////int startSeq = Math.Max(1, totalCount - recentCount + 1);
+                        //    ////oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.SeqRange;
+                        //    ////oClient.GetMailInfosParam.SeqRange = $"{startSeq}:*";
+
+                        //    // Filtra con IMAP SEARCH
+                        //    oClient.GetMailInfosParam.GetMailInfosOptions = GetMailInfosOptionType.DateRange;
+                        //    DateTime startDate = DateTime.Now.AddDays(-5);
+                        //    int totalCount = oClient.GetMailCount();
+                        //    int recentCount = Math.Min(500, totalCount);
+                        //    oClient.GetMailInfosParam.DateRange.SINCE = startDate;
+                        //    emails = oClient.GetMailInfos();
+                        //}
+                        //else
+                        //{
+                        //    DateTime fechaLimite = DateTime.Now.AddDays(-5);
+                        //    List<Mail> correosFiltrados = new List<Mail>();
+
+                        //    foreach (var info in emails)
+                        //    {
+                        //        Mail oMail = oClient.GetMail(info); // descarga completa
+                        //        if (oMail.ReceivedDate >= fechaLimite)
+                        //        {
+                        //            correosFiltrados.Add(oMail);
+                        //        }
+                        //    }
+
+                        //}
+
+
+
+
+
+                        int total = emails.Length;                   
+                        string path = ConfigurationManager.AppSettings["UbicacionArchivos"];
+                        ////if (total < _NumeroEmail)
+                        ////{
+                        ////    _NumeroEmail = _NumeroEmail - total;
+                        ////}
+                        //if (_NumeroEmail > total)
+                        //{
+                        //    _NumeroEmail = 0;
+                        //}
+                        int procesados = 0;
+                        int indiceInterno = cuenta.UltimoIndice;
+                        // int indiceInterno = _NumeroEmail;
+                        //for (int numeroCorreo = _NumeroEmail; numeroCorreo < emails.Length; numeroCorreo++)
+                        //foreach (var info in emails)
+                        foreach (var info in emails)
+                            //foreach (var info in emails.OrderBy(e => e.Index))
                         {
                             try
                             {
-                                MailInfo email = emails[numeroCorreo];
+                                //int numeroCorreo = indiceInterno;
+                                //MailInfo email = emails[numeroCorreo];
+                                MailInfo email = info;
+                               
+                              
+
+                                this.Invoke(new MethodInvoker(delegate
+                                {
+                                    TxtNumeroCorreo.Text = $"{indiceInterno} / {emails.Length}";
+                                }));
+
                                 Console.WriteLine("Index: {0}; Size: {1}; UIDL: {2}",
                                     email.Index, email.Size, email.UIDL);
 
@@ -760,17 +869,23 @@ namespace DataVoice.MotorEmail
                                             }
                                             break;
                                     }
+                                    //int ultimoGuardado = await NegocioAgente.ObtenerUltimoIndiceBD(cuenta.UserName);
+                                    //int indiceInterno = ultimoGuardado + 1;
+                                   
 
-                                    Newemail.Indice = email.Index;
+                                    //Newemail.Indice = email.Index;
                                     Newemail.Cuenta = cuenta.UserName;
                                     Newemail.ClaveGrupo = _GrupoEmail;
-
+                                    //Newemail.FechaUltimoRegistro = oMail.ReceivedDate;
                                     //TimeSpan diferencia = DateTime.Now - mensaje.ReceivedDate;
                                     //email.FechaCorreo = mensaje.ReceivedDate.Add(diferencia);
                                     Newemail.FechaCorreo = oMail.ReceivedDate.ToLocalTime();
                                     Newemail.Idmail = oMail.ReceivedDate.ToOADate() + cuenta.UserName;
                                     //email.ClaveGrupo = cuenta.Grupo;
-                                    Newemail.Titulo = oMail.Subject != null ? oMail.Subject : "";
+                                    //Newemail.Titulo = oMail.Subject != null ? oMail.Subject : "";
+                                    Newemail.Titulo = oMail.Subject != null
+                                    ? LimpiarEmojis(oMail.Subject)
+                                    : "";
 
                                     Newemail.NombreDe = oMail.From.Name;
 
@@ -801,19 +916,21 @@ namespace DataVoice.MotorEmail
                                             if (Newemail.Idmail != null)
                                                 if (!await NegocioAgente.ExisteEmailAsync(para.Address.Trim(), Newemail.Idmail.Trim()))
                                                 {
+                                                 
                                                     EmailAccounts cuentaPara = CurrentMailAccounts.Find(seleccion => seleccion.UserName == para.Address);
                                                     if (cuentaPara != null)
                                                     {
                                                         correoAgregado = true;
                                                         Newemail.Cuenta = cuentaPara.UserName;
-                                                        Newemail.Indice = cuentaPara.UltimoIndice + 1;
+                                                        //Newemail.Indice = cuentaPara.UltimoIndice;
+                                                        indiceInterno++;
+                                                        Newemail.Indice = indiceInterno;
                                                         //email.ClaveGrupo = cuentaPara.Grupo;
                                                         Newemail.ClaveGrupo = _GrupoEmail;
                                                         if (!await NegocioAgente.ExisteEmailAsync(Newemail.Cuenta, Newemail.Idmail))
                                                             await NegocioAgente.InsertarEmailAsync(Newemail);
-
+                                                   
                                                         Newemail.Cuenta = cuenta.UserName;
-                                                        Newemail.Indice = numeroCorreo;
                                                     }
                                                 }
                                                 else
@@ -826,6 +943,7 @@ namespace DataVoice.MotorEmail
                                                 {
                                                     correoAgregado = true;
                                                     await NegocioAgente.InsertarEmailAsync(Newemail);
+
                                                 }
                                         }
                                         if (correoAgregado)
@@ -895,14 +1013,29 @@ namespace DataVoice.MotorEmail
 
                                             }
                                         }
-                                        _CorreoProcesados = numeroCorreo;
-                                        this.Invoke(new MethodInvoker(delegate { BarraProgreso.Value = ((email.Index * 100) / total); }));
+                                        // _CorreoProcesados = numeroCorreo;
+                                        procesados++;
+                                        _CorreoProcesados = procesados;
+                                        //this.Invoke(new MethodInvoker(delegate { BarraProgreso.Value = ((email.Index * 100) / total); }));
+                                        int progreso = (int)((procesados * 100.0) / total);
+                                        if (progreso > 100) progreso = 100;
+
+
+                                        this.Invoke(new MethodInvoker(delegate
+                                        {
+                                            BarraProgreso.Value = progreso;
+                                            TxtCorreosProcesados.Text = procesados.ToString();
+                                        }));
+
                                         //Actualizamos la barra de progreso   
-                                        this.Invoke(new MethodInvoker(delegate { TxtCorreosProcesados.Text = _CorreoProcesados.ToString(); }));
+                                        //this.Invoke(new MethodInvoker(delegate { TxtCorreosProcesados.Text = _CorreoProcesados.ToString(); }));
+                                        this.Invoke(new MethodInvoker(delegate { TxtCorreosProcesados.Text = indiceInterno.ToString(); }));
+
                                         this.AddLogEntry(string.Format("{1}", "", ((Mail)oMail).Subject));
                                         //BackgroundWorker.ReportProgress(((numeroCorreo + 1 * 100) / total), oMail);
                                     }
                                 }
+                                
                             }
                             catch (Exception ex)
                             {
@@ -918,6 +1051,12 @@ namespace DataVoice.MotorEmail
                                 Thread.Sleep(5000);
                             }
                         }
+
+                        if (fechaMasReciente != null)
+                        {
+                            cuenta.FechaUltimoRegistro = fechaMasReciente.Value;
+                        }
+
                         // Quit and expunge emails marked as deleted from server.
                         oClient.Quit();
                         Console.WriteLine("Completed!");

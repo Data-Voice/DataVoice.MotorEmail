@@ -64,6 +64,8 @@ namespace DataVoice.MotorEmail.Models
         public string ConCopia { get; set; }
 
         public List<ArchivoAdjunto> ArchivosAdjuntos { get; set; }
+        public DateTime FechaUltimoRegistro { get; set; }
+
 
     }
 }

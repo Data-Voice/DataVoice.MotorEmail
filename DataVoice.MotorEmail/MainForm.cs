@@ -31,6 +31,8 @@ namespace DataVoice.MotorEmail
         int _CorreoProcesados;
         int _Temporizador = 60;
         int _NumeroEmail = 1;
+        private CancellationTokenSource _ctsObtenerCorreos;
+        private bool _procesando;
         string NameFile = ConfigurationManager.AppSettings["NameFile"].ToString();
         public delegate string AsyncMethodCaller(int callDuration, out int threadId);
 
@@ -38,34 +40,79 @@ namespace DataVoice.MotorEmail
         {
             this.MaximizeBox = false;
             InitializeComponent();
-            string cuentaEmail = "";
-            foreach (CuentaEmail cuenta in NegocioAgente.ObtenerCuentasEmailUsuario("G18"))
-            {
-                if (cuentaEmail != cuenta.Usuario)
-                {
-                    TreeNode node = new TreeNode(cuenta.Usuario);
-                    Cuentas.Nodes.Add(node);
-                }
-                cuentaEmail = cuenta.Usuario;
-                //TreeNode node = new TreeNode(cuenta.Usuario + cuenta.ClaveGrupo);
+        }
 
+        protected override async void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            await CargarCuentasAsync();
+        }
+
+        private async Task CargarCuentasAsync()
+        {
+            try
+            {
+                string cuentaEmail = "";
+                foreach (CuentaEmail cuenta in await NegocioAgente.ObtenerCuentasEmailUsuarioAsync("G18"))
+                {
+                    if (cuentaEmail != cuenta.Usuario)
+                    {
+                        TreeNode node = new TreeNode(cuenta.Usuario);
+                        Cuentas.Nodes.Add(node);
+                    }
+                    cuentaEmail = cuenta.Usuario;
+                }
+            }
+            catch (Exception ex)
+            {
+                await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), "Error al cargar las cuentas: " + ex);
             }
         }
 
         private async void _bRetrieveMessageList_Click(object sender, EventArgs e)
         {
+            BarraProgreso.Value = 0;
             BarraProgreso.Refresh();
             LstCorreos.Items.Clear();
-            //if (!BackgroundWorker.IsBusy)
-            // BackgroundWorker.RunWorkerAsync();
-
             await ObtenerCorreos();
-            BtnBajarCorreos.Enabled = false;
         }
 
         private void BtnCancelar_Click(object sender, EventArgs e)
         {
-            BackgroundWorker.CancelAsync();
+            if (_ctsObtenerCorreos != null)
+            {
+                _ctsObtenerCorreos.Cancel();
+                LblMensaje.Text = "Cancelando...";
+            }
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            try
+            {
+                if (_ctsObtenerCorreos != null)
+                    _ctsObtenerCorreos.Cancel();
+            }
+            catch
+            {
+            }
+            base.OnFormClosing(e);
+        }
+
+        private void ActualizarUI(Action accion)
+        {
+            try
+            {
+                if (IsDisposed || !IsHandleCreated)
+                    return;
+                Invoke(accion);
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
         }
 
         public void AddLogEntry(string entry)
@@ -81,10 +128,12 @@ namespace DataVoice.MotorEmail
             sb.Append(d.Millisecond.ToString().PadLeft(3, '0'));
             sb.Append(" | ");
             sb.Append(entry);
-            this.Invoke(new MethodInvoker(delegate
+            ActualizarUI(delegate
             {
-                this.LstCorreos.Items.Insert(0, sb.ToString());
-            }));
+                LstCorreos.Items.Insert(0, sb.ToString());
+                while (LstCorreos.Items.Count > 200)
+                    LstCorreos.Items.RemoveAt(LstCorreos.Items.Count - 1);
+            });
         }
 
         async Task<string> ObtenerGrupoPorSubject(string cadenaSubject, string cuentaEmail)
@@ -580,6 +629,29 @@ private static string LimpiarEmojis(string texto)
 
     public async Task ObtenerCorreos()
         {
+            if (_procesando)
+                return;
+
+            List<string> cuentasSeleccionadas = Cuentas.Nodes.Cast<TreeNode>()
+                .Where(n => n.Checked)
+                .Select(n => n.Text)
+                .ToList();
+
+            if (cuentasSeleccionadas.Count == 0)
+                return;
+
+            _procesando = true;
+            _ctsObtenerCorreos = new CancellationTokenSource();
+            CancellationToken token = _ctsObtenerCorreos.Token;
+            BtnBajarCorreos.Enabled = false;
+            LblTemporizador.Text = "Procesando";
+            LblMensaje.Text = "";
+            Temporizador.Stop();
+
+            try
+            {
+            await Task.Run(async () =>
+            {
             MailClient oClient = null;
             MailServer oServer = null;
             CuentasEmail cuenta = null;
@@ -588,27 +660,22 @@ private static string LimpiarEmojis(string texto)
             DateTime start = DateTime.Now;
             try
             {
-               
-                this.Invoke(new MethodInvoker(delegate { LblTemporizador.Text = "Procesando"; }));
-                this.Invoke(new MethodInvoker(delegate { LblMensaje.Text = ""; }));
                 string LicenseCodeEAGetMail = ConfigurationManager.AppSettings["LicenseCodeEAGetMail"];
-
-                Temporizador.Stop();
                 List<CuentasEmail> cuentas = await NegocioAgente.ObtenerCuentasEmailAsync("G18");
 
-                foreach (TreeNode nodo in Cuentas.Nodes)
+                foreach (string nodoText in cuentasSeleccionadas)
                 {
-                    if (nodo.Checked)
-                    {
+                    if (token.IsCancellationRequested)
+                        break;
                         try
                         {
                         //MailServer oServer;
                         //EmailAccounts cuenta = CurrentMailAccounts.Find(seleccion => seleccion.UserName == nodo.Text);
                         //CuentasEmail cuenta = cuentas.Where(seleccion => seleccion.UserName == nodo.Text).FirstOrDefault();
-                        cuenta = cuentas.Where(seleccion => seleccion.UserName == nodo.Text).FirstOrDefault();
+                        cuenta = cuentas.Where(seleccion => seleccion.UserName == nodoText).FirstOrDefault();
                         if (cuenta == null)
                         {
-                            await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), "La cuenta del nodo '" + nodo.Text + "' no existe en la vista de cuentas.");
+                            await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), "La cuenta del nodo '" + nodoText + "' no existe en la vista de cuentas.");
                             continue;
                         }
                         _NumeroEmail = cuenta.UltimoIndice;
@@ -736,6 +803,8 @@ private static string LimpiarEmojis(string texto)
                         int procesados = 0;
                         int indiceInterno = cuenta.UltimoIndice;
                         bool abortarCuenta = false;
+                        Stopwatch sw = Stopwatch.StartNew();
+                        long ultimaActualizacion = 0;
                         foreach (var info in emails.OrderBy(e => e.Index))
                         {
                             bool reintentado = false;
@@ -743,14 +812,8 @@ private static string LimpiarEmojis(string texto)
                             {
                             try
                             {
+                                token.ThrowIfCancellationRequested();
                                 MailInfo email = info;
-                               
-                              
-
-                                this.Invoke(new MethodInvoker(delegate
-                                {
-                                    TxtNumeroCorreo.Text = $"{indiceInterno} / {emails.Length}";
-                                }));
 
                                 Console.WriteLine("Index: {0}; Size: {1}; UIDL: {2}",
                                     email.Index, email.Size, email.UIDL);
@@ -939,22 +1002,21 @@ private static string LimpiarEmojis(string texto)
                                         // _CorreoProcesados = numeroCorreo;
                                         procesados++;
                                         _CorreoProcesados = procesados;
-                                        //this.Invoke(new MethodInvoker(delegate { BarraProgreso.Value = ((email.Index * 100) / total); }));
-                                        int progreso = (int)((procesados * 100.0) / total);
-                                        if (progreso > 100) progreso = 100;
-
-
-                                        this.Invoke(new MethodInvoker(delegate
+                                        if (sw.ElapsedMilliseconds - ultimaActualizacion >= 250)
                                         {
-                                            BarraProgreso.Value = progreso;
-                                            TxtCorreosProcesados.Text = procesados.ToString();
-                                        }));
-
-                                        //Actualizamos la barra de progreso   
-                                        //this.Invoke(new MethodInvoker(delegate { TxtCorreosProcesados.Text = _CorreoProcesados.ToString(); }));
-                                        this.Invoke(new MethodInvoker(delegate { TxtCorreosProcesados.Text = indiceInterno.ToString(); }));
-
-                                        this.AddLogEntry(string.Format("{1}", "", ((Mail)oMail).Subject));
+                                            ultimaActualizacion = sw.ElapsedMilliseconds;
+                                            int progreso = (int)((procesados * 100.0) / total);
+                                            if (progreso > 100) progreso = 100;
+                                            int indiceMostrado = indiceInterno;
+                                            int procesadosMostrados = procesados;
+                                            ActualizarUI(delegate
+                                            {
+                                                BarraProgreso.Value = progreso;
+                                                TxtCorreosProcesados.Text = procesadosMostrados.ToString();
+                                                TxtNumeroCorreo.Text = indiceMostrado + " / " + total;
+                                            });
+                                            AddLogEntry(oMail.Subject);
+                                        }
                                         //BackgroundWorker.ReportProgress(((numeroCorreo + 1 * 100) / total), oMail);
                                     }
                                 }
@@ -962,6 +1024,12 @@ private static string LimpiarEmojis(string texto)
                             }
                             catch (Exception ex)
                             {
+                                if (ex is OperationCanceledException)
+                                {
+                                    abortarCuenta = true;
+                                    break;
+                                }
+
                                 await RegistrarError(ex, cuenta, oServer);
 
                                 if (EsErrorDeTransporte(ex) && !reintentado && ReconectarCliente(oClient, oServer))
@@ -978,6 +1046,16 @@ private static string LimpiarEmojis(string texto)
                                 break;
                         }
 
+                        if (!abortarCuenta && !token.IsCancellationRequested && procesados > 0)
+                        {
+                            int procesadosFinal = procesados;
+                            ActualizarUI(delegate
+                            {
+                                BarraProgreso.Value = 100;
+                                TxtCorreosProcesados.Text = procesadosFinal.ToString();
+                            });
+                        }
+
                         if (fechaMasReciente != null)
                         {
                             cuenta.FechaUltimoRegistro = fechaMasReciente.Value;
@@ -992,7 +1070,6 @@ private static string LimpiarEmojis(string texto)
                         CerrarCliente(oClient);
                         await RegistrarError(ex, cuenta, oServer);
                     }
-                    }
                 }
             }
             catch (Exception ex)
@@ -1003,24 +1080,40 @@ private static string LimpiarEmojis(string texto)
                 await SendErrorToAPI(ex, usuarioError, servidorError);
 
                 await saveLOGAsync("Admin", DateTime.Now.ToString("ddMMyyyy"), ex.Message.ToString()+"_"+ ex.StackTrace + "_" + ex.ToString());
-                this.Invoke(new MethodInvoker(delegate { BtnBajarCorreos.Enabled = true; }));
-                this.Invoke(new MethodInvoker(delegate { LblMensaje.Text = "Error: " + ex.Message.ToString(); }));
+                ActualizarUI(delegate
+                {
+                    BtnBajarCorreos.Enabled = true;
+                    LblMensaje.Text = "Error: " + ex.Message.ToString();
+                });
                 Int32 segundosSleepErrorEmail = Convert.ToInt32(ConfigurationManager.AppSettings["SegundosSleepErrorEmail"]) * 1000;
                 await Task.Delay(segundosSleepErrorEmail);
             }
             finally
             {
-                
                 _Temporizador = Convert.ToInt32(ConfigurationManager.AppSettings["TiempoTimerEmail"]);
-                Temporizador.Start();
-                this.Invoke(new MethodInvoker(delegate { LblMensaje.Text = "La Tarea fue Completada. Fecha Fin " + DateTime.Now + " "; }));
-                this.Invoke(new MethodInvoker(delegate { BtnBajarCorreos.Enabled = true; }));
+                ActualizarUI(delegate
+                {
+                    Temporizador.Start();
+                    LblMensaje.Text = "La Tarea fue Completada. Fecha Fin " + DateTime.Now + " ";
+                    BtnBajarCorreos.Enabled = true;
+                });
             }
-           
+
             TimeSpan duration = DateTime.Now - start;
             //aquí podríamos devolver información de utilidad, como el resultado de un cálculo,
             //número de elementos afectados, etc.. de manera sencilla y segura
             //al hilo principal
+            });
+            }
+            finally
+            {
+                _procesando = false;
+                if (_ctsObtenerCorreos != null)
+                {
+                    _ctsObtenerCorreos.Dispose();
+                    _ctsObtenerCorreos = null;
+                }
+            }
         }
         private static bool EsErrorDeTransporte(Exception ex)
         {

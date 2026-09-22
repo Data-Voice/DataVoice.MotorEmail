@@ -1272,36 +1272,18 @@ private static string LimpiarEmojis(string texto)
             {
                 using (HttpClient client = new HttpClient())
                 {
-                    //var payload = new
-                    //{
-                    //    Usuario = cuentaCorreo ?? "Desconocido",
-                    //    Cuenta = cuentaCorreo ?? "Desconocido",
-                    //    Servidor = servidor ?? "Desconocido",
-                    //    Accion = ex.Message + " | " + ex.StackTrace,
-                    //    Sitio = sitio,
-                    //    Ip = Environment.MachineName
-                    //};
+                    client.Timeout = TimeSpan.FromSeconds(10);
                     var payload = new
                     {
                         usuario = cuentaCorreo ?? "Desconocido",
-                        error = ex.Message + " | " + ex.StackTrace + " | " + servidor ?? "Desconocido",
-                        accion = "Error en la tarea MOTOR DE CORREOS", // opcional
+                        error = ex.Message + " | " + ex.StackTrace + " | " + (servidor ?? "Desconocido"),
+                        accion = "Error en la tarea MOTOR DE CORREOS",
                         sitio = sitio,
                         ip = Environment.MachineName
                     };
 
-                    // Consumir la API
-                    var response = await client.PostAsJsonAsync(
-                        "https://appt.datavoice.com.mx/APIErrorMotores/api/ApiErrorNotifier",
-                        payload
-                    );
+                    var response = await client.PostAsJsonAsync(Program.ObtenerUrlApiErrores(), payload);
 
-                    //                    var response = await client.PostAsJsonAsync(
-                    //"http://localhost:29139/api/ApiErrorNotifier",
-                    //                       payload
-                    //                   );
-
-                    // Opcional: revisar si la API respondió OK
                     if (!response.IsSuccessStatusCode)
                     {
                         Console.WriteLine($"Error enviando log a la API: {response.StatusCode}");

@@ -2265,7 +2265,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_1DFB6E14D1E5495C81ADEC68FF25BA8A"
             {
-            "SourcePath" = "8:..\\DataVoice.MotorEmail\\obj\\x86\\Debug\\DataVoice.MotorEmail.exe"
+            "SourcePath" = "8:..\\DataVoice.MotorEmail\\obj\\x86\\Release\\DataVoice.MotorEmail.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_4FCB05C8F82D423084F5AD8539CBCE28"
@@ -2293,7 +2293,7 @@
             }
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_8A687B3A4D4641BD8CCC78EF0267A352"
             {
-            "SourcePath" = "8:..\\DataVoice.MotorEmail\\obj\\x86\\Debug\\DataVoice.MotorEmail.exe"
+            "SourcePath" = "8:..\\DataVoice.MotorEmail\\obj\\x86\\Release\\DataVoice.MotorEmail.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_4FCB05C8F82D423084F5AD8539CBCE28"

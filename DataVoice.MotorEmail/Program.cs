@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -10,6 +11,13 @@ namespace DataVoice.MotorEmail
 {
     static class Program
     {
+        internal const string UrlApiErroresPorDefecto = "https://appt.datavoice.com.mx/APIErrorMotores/api/ApiErrorNotifier";
+
+        internal static string ObtenerUrlApiErrores()
+        {
+            string url = ConfigurationManager.AppSettings["ApiErrorUrl"];
+            return string.IsNullOrEmpty(url) ? UrlApiErroresPorDefecto : url;
+        }
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
@@ -49,6 +57,7 @@ namespace DataVoice.MotorEmail
             {
                 using (HttpClient client = new HttpClient())
                 {
+                    client.Timeout = TimeSpan.FromSeconds(10);
                     var payload = new
                     {
                         usuario = "Global",
@@ -58,7 +67,7 @@ namespace DataVoice.MotorEmail
                         ip = Environment.MachineName
                     };
 
-                    await client.PostAsJsonAsync("http://localhost:29139/api/ApiErrorNotifier", payload);
+                    await client.PostAsJsonAsync(ObtenerUrlApiErrores(), payload);
                 }
             }
             catch

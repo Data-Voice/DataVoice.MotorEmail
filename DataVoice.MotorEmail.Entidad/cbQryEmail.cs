@@ -191,7 +191,6 @@ namespace DataVoice.MotorEmail.Entidad
                         table.Rows.Add(cadenaCuenta, cadenaClaveGrupo, resultCadenaSplit, cadenaActiveSubject);
                     }
                 }
-                table.Load(rd);
                 return table;
             }
             catch (Exception ex)

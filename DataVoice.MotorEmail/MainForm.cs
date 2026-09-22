@@ -756,9 +756,10 @@ private static string LimpiarEmojis(string texto)
 
                             foreach (var info in todos)
                             {
-                                Mail m = oClient.GetMail(info);
+                                Mail m = new Mail(LicenseCodeEAGetMail);
+                                m.Load(oClient.GetMailHeader(info));
 
-                                if (m.ReceivedDate >= fechaFiltro)
+                                if (m.ReceivedDate.ToLocalTime() >= fechaFiltro)
                                     filtrados.Add(info);
                             }
 
@@ -809,6 +810,7 @@ private static string LimpiarEmojis(string texto)
                         string path = ConfigurationManager.AppSettings["UbicacionArchivos"];
                         int procesados = 0;
                         int indiceInterno = cuenta.UltimoIndice;
+                        DataTable matriz = await NegocioAgente.ObtenerRegistrosMaiMatAsync(9, cuenta.UserName);
                         bool abortarCuenta = false;
                         Stopwatch sw = Stopwatch.StartNew();
                         long ultimaActualizacion = 0;
@@ -834,7 +836,6 @@ private static string LimpiarEmojis(string texto)
                                     Email Newemail = new Email();
                                     string _GrupoEmail = "";
 
-                                    DataTable matriz = await NegocioAgente.ObtenerRegistrosMaiMatAsync(9, cuenta.UserName);
                                     string cadenaMensaje = oMail.Subject.ToLower();
 
                                     for (int item = 0; item < matriz.Rows.Count; item++)

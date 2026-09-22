@@ -48,6 +48,7 @@
             this.label5 = new System.Windows.Forms.Label();
             this.LblTemporizador = new System.Windows.Forms.Label();
             this.LblMensaje = new System.Windows.Forms.Label();
+            this.LblErrores = new System.Windows.Forms.Label();
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.SuspendLayout();
@@ -220,11 +221,22 @@
             this.LblMensaje.TabIndex = 35;
             this.LblMensaje.Text = "Mensaje del Sistema";
             // 
+            // LblErrores
+            // 
+            this.LblErrores.AutoSize = false;
+            this.LblErrores.Font = new System.Drawing.Font("Arial", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.LblErrores.ForeColor = System.Drawing.Color.Firebrick;
+            this.LblErrores.Location = new System.Drawing.Point(260, 80);
+            this.LblErrores.Name = "LblErrores";
+            this.LblErrores.Size = new System.Drawing.Size(661, 32);
+            this.LblErrores.TabIndex = 36;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(933, 626);
+            this.Controls.Add(this.LblErrores);
             this.Controls.Add(this.LblMensaje);
             this.Controls.Add(this.label5);
             this.Controls.Add(this.LblTemporizador);
@@ -269,6 +281,7 @@
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Label LblTemporizador;
         private System.Windows.Forms.Label LblMensaje;
+        private System.Windows.Forms.Label LblErrores;
     }
 }
 

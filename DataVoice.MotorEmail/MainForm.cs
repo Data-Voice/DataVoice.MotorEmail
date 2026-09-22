@@ -33,6 +33,9 @@ namespace DataVoice.MotorEmail
         int _NumeroEmail = 1;
         private CancellationTokenSource _ctsObtenerCorreos;
         private bool _procesando;
+        private readonly Dictionary<string, int> _erroresPorCategoria = new Dictionary<string, int>();
+        private int _erroresTotales;
+        private string _ultimoError = "";
         string NameFile = ConfigurationManager.AppSettings["NameFile"].ToString();
         public delegate string AsyncMethodCaller(int callDuration, out int threadId);
 
@@ -643,9 +646,13 @@ private static string LimpiarEmojis(string texto)
             _procesando = true;
             _ctsObtenerCorreos = new CancellationTokenSource();
             CancellationToken token = _ctsObtenerCorreos.Token;
+            _erroresTotales = 0;
+            _erroresPorCategoria.Clear();
+            _ultimoError = "";
             BtnBajarCorreos.Enabled = false;
             LblTemporizador.Text = "Procesando";
             LblMensaje.Text = "";
+            LblErrores.Text = "";
             Temporizador.Stop();
 
             try
@@ -1151,12 +1158,58 @@ private static string LimpiarEmojis(string texto)
             }
         }
 
+        private static string CategorizarError(Exception ex)
+        {
+            if (EsErrorDeTransporte(ex))
+                return "Transporte";
+            string tipo = ex.GetType().FullName ?? "";
+            if (tipo.StartsWith("MySql"))
+                return "BD";
+            if (ex is UnauthorizedAccessException || ex is DirectoryNotFoundException || ex is DriveNotFoundException || tipo.StartsWith("System.IO"))
+                return "Archivos/Red";
+            if (ex is WebException || tipo.StartsWith("Microsoft.Identity") || tipo.Contains("OAuth"))
+                return "OAuth";
+            return "Otro";
+        }
+
+        private void MostrarResumenErrores()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("Errores: ");
+            sb.Append(_erroresTotales);
+            sb.Append(" (");
+            bool primero = true;
+            foreach (var item in _erroresPorCategoria.OrderByDescending(k => k.Value))
+            {
+                if (!primero)
+                    sb.Append(" | ");
+                sb.Append(item.Key);
+                sb.Append(" ");
+                sb.Append(item.Value);
+                primero = false;
+            }
+            sb.Append(") - Ultimo: ");
+            sb.Append(_ultimoError);
+            string texto = sb.ToString();
+            ActualizarUI(delegate { LblErrores.Text = texto; });
+        }
+
         private async Task RegistrarError(Exception ex, CuentasEmail cuenta, MailServer oServer)
         {
             string usuario = cuenta?.UserName ?? "Desconocido";
             string servidor = oServer?.Server ?? "Desconocido";
+            string categoria = CategorizarError(ex);
+
+            _erroresTotales++;
+            if (_erroresPorCategoria.ContainsKey(categoria))
+                _erroresPorCategoria[categoria]++;
+            else
+                _erroresPorCategoria[categoria] = 1;
+            _ultimoError = DateTime.Now.ToString("HH:mm:ss") + " " + usuario + ": " + ex.Message;
+            MostrarResumenErrores();
+
             await SendErrorToAPI(ex, usuario, servidor);
-            await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), usuario + "@" + servidor + ": " + ex.ToString());
+            await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), categoria + " | " + usuario + "@" + servidor + ": " + ex.ToString());
         }
 
         static string _generateFileName(int sequence)

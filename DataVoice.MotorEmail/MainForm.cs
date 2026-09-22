@@ -28,7 +28,6 @@ namespace DataVoice.MotorEmail
 {
     public partial class MainForm : Form
     {
-        public static List<EmailAccounts> CurrentMailAccounts = new List<EmailAccounts>();
         int _CorreoProcesados;
         int _Temporizador = 60;
         int _NumeroEmail = 1;
@@ -447,8 +446,10 @@ namespace DataVoice.MotorEmail
             try
             {
                 string fecha_actual = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
-                // string path = Environment.CurrentDirectory + @"\" + usuario + "_" + fecha + ".txt";
-                string path = @"C:\Temporales\LogEmail\" + usuario + NameFile + "_" + fecha + ".txt";
+                string directorio = @"C:\Temporales\LogEmail\";
+                if (!Directory.Exists(directorio))
+                    Directory.CreateDirectory(directorio);
+                string path = directorio + usuario + NameFile + "_" + fecha + ".txt";
                 string Conten = "[" + fecha_actual + "]\n {Usuario: " + usuario + ", accionRealizada: " + accion + " ]";
                 using (FileStream fs = new FileStream(path, FileMode.OpenOrCreate))
                 {
@@ -456,11 +457,9 @@ namespace DataVoice.MotorEmail
                     using (StreamWriter writer = new StreamWriter(fs))
                         writer.WriteLine(Conten);
                 }
-                //File.AppendAllText(path, Conten + Environment.NewLine);
             }
-            catch (Exception ex)
+            catch
             {
-                throw ex;
             }
         }
 
@@ -469,8 +468,10 @@ namespace DataVoice.MotorEmail
             try
             {
                 string fecha_actual = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
-                // string path = Environment.CurrentDirectory + @"\" + usuario + "_" + fecha + ".txt";
-                string path = @"C:\Temporales\LogEmail\" + usuario + NameFile + "_" + fecha + ".txt";
+                string directorio = @"C:\Temporales\LogEmail\";
+                if (!Directory.Exists(directorio))
+                    Directory.CreateDirectory(directorio);
+                string path = directorio + usuario + NameFile + "_" + fecha + ".txt";
                 string Conten = "[" + fecha_actual + "]\n {Usuario: " + usuario + ", accionRealizada: " + accion + " ]";
                 using (FileStream fs = new FileStream(path, FileMode.OpenOrCreate))
                 {
@@ -478,11 +479,9 @@ namespace DataVoice.MotorEmail
                     using (StreamWriter writer = new StreamWriter(fs))
                         await writer.WriteLineAsync(Conten);
                 }
-                //File.AppendAllText(path, Conten + Environment.NewLine);
             }
-            catch (Exception ex)
+            catch
             {
-                throw ex;
             }
         }
 
@@ -530,50 +529,6 @@ namespace DataVoice.MotorEmail
             BtnBajarCorreos.Enabled = true;
         }
         #endregion
-
-        void CargarCuentasEmail()
-        {
-            CurrentMailAccounts = new List<EmailAccounts>();
-            foreach (CuentaEmail cuenta in NegocioAgente.ObtenerCuentasEmailUsuario("G18"))
-            {
-                EmailAccounts account = new EmailAccounts();
-                account.Server = cuenta.Servidor;
-                account.UserName = cuenta.Usuario;
-                account.Password = cuenta.Password;
-                account.Grupo = cuenta.ClaveGrupo;
-                account.UltimoIndice = cuenta.UltimoIndice;
-                account.ActivoSubjet = cuenta.ActivoSubjet;
-                account.Subjet = cuenta.Subjet;
-                account.PuertoEntrada = cuenta.PuertoEntrada;
-                account.CrifadoEntrada = cuenta.CrifadoEntrada;
-                account.PuertoSalida = cuenta.PuertoSalida;
-                account.CifradoSalida = cuenta.CifradoSalida;
-
-                CurrentMailAccounts.Add(account);
-            }
-        }
-
-        async Task CargarCuentasEmailAsync()
-        {
-            CurrentMailAccounts = new List<EmailAccounts>();
-            foreach (CuentaEmail cuenta in await NegocioAgente.ObtenerCuentasEmailUsuarioAsync("G18"))
-            {
-                EmailAccounts account = new EmailAccounts();
-                account.Server = cuenta.Servidor;
-                account.UserName = cuenta.Usuario;
-                account.Password = cuenta.Password;
-                account.Grupo = cuenta.ClaveGrupo;
-                account.UltimoIndice = cuenta.UltimoIndice;
-                account.ActivoSubjet = cuenta.ActivoSubjet;
-                account.Subjet = cuenta.Subjet;
-                account.PuertoEntrada = cuenta.PuertoEntrada;
-                account.CrifadoEntrada = cuenta.CrifadoEntrada;
-                account.PuertoSalida = cuenta.PuertoSalida;
-                account.CifradoSalida = cuenta.CifradoSalida;
-
-                CurrentMailAccounts.Add(account);
-            }
-        }
 
         private async void Temporizador_Tick(object sender, EventArgs e)
         {
@@ -645,10 +600,17 @@ private static string LimpiarEmojis(string texto)
                 {
                     if (nodo.Checked)
                     {
+                        try
+                        {
                         //MailServer oServer;
                         //EmailAccounts cuenta = CurrentMailAccounts.Find(seleccion => seleccion.UserName == nodo.Text);
                         //CuentasEmail cuenta = cuentas.Where(seleccion => seleccion.UserName == nodo.Text).FirstOrDefault();
                         cuenta = cuentas.Where(seleccion => seleccion.UserName == nodo.Text).FirstOrDefault();
+                        if (cuenta == null)
+                        {
+                            await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), "La cuenta del nodo '" + nodo.Text + "' no existe en la vista de cuentas.");
+                            continue;
+                        }
                         _NumeroEmail = cuenta.UltimoIndice;
                         if (cuenta.Oauth2)
                         {
@@ -659,6 +621,12 @@ private static string LimpiarEmojis(string texto)
                             oServer = await RetrieveEmail(cuenta);
                         }
 
+
+                        if (oServer == null)
+                        {
+                            await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), "No se pudo crear el servidor de correo para '" + cuenta.UserName + "'.");
+                            continue;
+                        }
 
                         //MailClient oClient = new MailClient(LicenseCodeEAGetMail);
                         oClient = new MailClient(LicenseCodeEAGetMail);
@@ -681,18 +649,12 @@ private static string LimpiarEmojis(string texto)
                         //MailInfo[] emails = oClient.GetMailInfos();
 
                         bool isImap = (oServer.Protocol == ServerProtocol.Imap4);
-                        DateTime fechaFiltro;
-
-                        if (cuenta.FechaUltimoRegistro == null || cuenta.FechaUltimoRegistro == DateTime.MinValue)
-                        {
-                            fechaFiltro = DateTime.Now.AddDays(-5);
-                        }
-                        else
-                        {
-
-                            fechaFiltro = cuenta.FechaUltimoRegistro.Value.AddSeconds(-1);
-
-                        }
+                        int diasMaximo = 5;
+                        int.TryParse(ConfigurationManager.AppSettings["DiasMaximo"], out diasMaximo);
+                        bool sinFechaUltimoRegistro = cuenta.FechaUltimoRegistro == null || cuenta.FechaUltimoRegistro == DateTime.MinValue;
+                        DateTime fechaFiltro = sinFechaUltimoRegistro
+                            ? DateTime.Now.AddDays(-diasMaximo)
+                            : cuenta.FechaUltimoRegistro.Value.AddSeconds(-1);
 
                         MailInfo[] emails = null;
 
@@ -702,7 +664,8 @@ private static string LimpiarEmojis(string texto)
                             Imap4Folder inboxFolder = folders
                                 .FirstOrDefault(f => f.Name.Equals("INBOX", StringComparison.OrdinalIgnoreCase));
 
-                            oClient.SelectFolder(inboxFolder);
+                            if (inboxFolder != null)
+                                oClient.SelectFolder(inboxFolder);
 
                           
                             oClient.GetMailInfosParam.Reset();
@@ -768,28 +731,18 @@ private static string LimpiarEmojis(string texto)
 
 
 
-                        int total = emails.Length;                   
+                        int total = emails.Length;
                         string path = ConfigurationManager.AppSettings["UbicacionArchivos"];
-                        ////if (total < _NumeroEmail)
-                        ////{
-                        ////    _NumeroEmail = _NumeroEmail - total;
-                        ////}
-                        //if (_NumeroEmail > total)
-                        //{
-                        //    _NumeroEmail = 0;
-                        //}
                         int procesados = 0;
                         int indiceInterno = cuenta.UltimoIndice;
-                        // int indiceInterno = _NumeroEmail;
-                        //for (int numeroCorreo = _NumeroEmail; numeroCorreo < emails.Length; numeroCorreo++)
-                        //foreach (var info in emails)
-                        foreach (var info in emails)
-                            //foreach (var info in emails.OrderBy(e => e.Index))
+                        bool abortarCuenta = false;
+                        foreach (var info in emails.OrderBy(e => e.Index))
                         {
+                            bool reintentado = false;
+                            while (true)
+                            {
                             try
                             {
-                                //int numeroCorreo = indiceInterno;
-                                //MailInfo email = emails[numeroCorreo];
                                 MailInfo email = info;
                                
                               
@@ -804,14 +757,9 @@ private static string LimpiarEmojis(string texto)
 
                                 // Receive email from email server
                                 Mail oMail = oClient.GetMail(email);
-                                string DiasMaximo = ConfigurationManager.AppSettings["DiasMaximo"].ToString();
-                                int diasMaximo = 0;
-                                int.TryParse(DiasMaximo, out diasMaximo);
-                                DateTime FechaActual = DateTime.Now;
-                                var diferencia = FechaActual - oMail.ReceivedDate;
-                                var diasDiferencia = diferencia.Days;
+                                var diasDiferencia = (DateTime.Now - oMail.ReceivedDate.ToLocalTime()).Days;
 
-                                if (diasDiferencia < diasMaximo)
+                                if (!sinFechaUltimoRegistro || diasDiferencia < diasMaximo)
                                 {
                                     Email Newemail = new Email();
                                     string _GrupoEmail = "";
@@ -880,6 +828,7 @@ private static string LimpiarEmojis(string texto)
                                     //TimeSpan diferencia = DateTime.Now - mensaje.ReceivedDate;
                                     //email.FechaCorreo = mensaje.ReceivedDate.Add(diferencia);
                                     Newemail.FechaCorreo = oMail.ReceivedDate.ToLocalTime();
+                                    Newemail.FechaUltimoRegistro = Newemail.FechaCorreo;
                                     Newemail.Idmail = oMail.ReceivedDate.ToOADate() + cuenta.UserName;
                                     //email.ClaveGrupo = cuenta.Grupo;
                                     //Newemail.Titulo = oMail.Subject != null ? oMail.Subject : "";
@@ -910,42 +859,16 @@ private static string LimpiarEmojis(string texto)
                                         Newemail.ArchivoAdjunto = pathEmail;
 
                                         bool correoAgregado = false;
-                                        bool correoExistente = false;
-                                        foreach (MailAddress para in oMail.To)
+                                        if (Newemail.Idmail != null &&
+                                            !await NegocioAgente.ExisteEmailAsync(Newemail.Cuenta, Newemail.Idmail))
                                         {
-                                            if (Newemail.Idmail != null)
-                                                if (!await NegocioAgente.ExisteEmailAsync(para.Address.Trim(), Newemail.Idmail.Trim()))
-                                                {
-                                                 
-                                                    EmailAccounts cuentaPara = CurrentMailAccounts.Find(seleccion => seleccion.UserName == para.Address);
-                                                    if (cuentaPara != null)
-                                                    {
-                                                        correoAgregado = true;
-                                                        Newemail.Cuenta = cuentaPara.UserName;
-                                                        //Newemail.Indice = cuentaPara.UltimoIndice;
-                                                        indiceInterno++;
-                                                        Newemail.Indice = indiceInterno;
-                                                        //email.ClaveGrupo = cuentaPara.Grupo;
-                                                        Newemail.ClaveGrupo = _GrupoEmail;
-                                                        if (!await NegocioAgente.ExisteEmailAsync(Newemail.Cuenta, Newemail.Idmail))
-                                                            await NegocioAgente.InsertarEmailAsync(Newemail);
-                                                   
-                                                        Newemail.Cuenta = cuenta.UserName;
-                                                    }
-                                                }
-                                                else
-                                                    correoExistente = true;
+                                            indiceInterno++;
+                                            Newemail.Indice = indiceInterno;
+                                            correoAgregado = true;
+                                            await NegocioAgente.InsertarEmailAsync(Newemail);
                                         }
-                                        if (correoAgregado == false && correoExistente == false)
-                                        {
-                                            if (Newemail.Idmail != null)
-                                                if (!await NegocioAgente.ExisteEmailAsync(Newemail.Cuenta, Newemail.Idmail))
-                                                {
-                                                    correoAgregado = true;
-                                                    await NegocioAgente.InsertarEmailAsync(Newemail);
-
-                                                }
-                                        }
+                                        if (fechaMasReciente == null || Newemail.FechaCorreo > fechaMasReciente)
+                                            fechaMasReciente = Newemail.FechaCorreo;
                                         if (correoAgregado)
                                         {
                                             if (!Directory.Exists(pathEmail))
@@ -1035,21 +958,24 @@ private static string LimpiarEmojis(string texto)
                                         //BackgroundWorker.ReportProgress(((numeroCorreo + 1 * 100) / total), oMail);
                                     }
                                 }
-                                
+                                break;
                             }
                             catch (Exception ex)
                             {
-                                oClient.Quit();
-                                string usuarioError = cuenta?.UserName ?? "Desconocido";
-                                string servidorError = oServer?.Server ?? "Desconocido";
+                                await RegistrarError(ex, cuenta, oServer);
 
-                                // Solo enviamos a la API
-                                await SendErrorToAPI(ex, usuarioError, servidorError);
-                              
-                               
-                                await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), ex.Message.ToString());
-                                Thread.Sleep(5000);
+                                if (EsErrorDeTransporte(ex) && !reintentado && ReconectarCliente(oClient, oServer))
+                                {
+                                    reintentado = true;
+                                    continue;
+                                }
+
+                                abortarCuenta = true;
+                                break;
                             }
+                            }
+                            if (abortarCuenta)
+                                break;
                         }
 
                         if (fechaMasReciente != null)
@@ -1058,14 +984,20 @@ private static string LimpiarEmojis(string texto)
                         }
 
                         // Quit and expunge emails marked as deleted from server.
-                        oClient.Quit();
+                        CerrarCliente(oClient);
                         Console.WriteLine("Completed!");
+                    }
+                    catch (Exception ex)
+                    {
+                        CerrarCliente(oClient);
+                        await RegistrarError(ex, cuenta, oServer);
+                    }
                     }
                 }
             }
             catch (Exception ex)
             {
-                oClient.Quit();
+                CerrarCliente(oClient);
                 string usuarioError = cuenta?.UserName ?? "Desconocido";
                 string servidorError = oServer?.Server ?? "Desconocido";
                 await SendErrorToAPI(ex, usuarioError, servidorError);
@@ -1074,9 +1006,7 @@ private static string LimpiarEmojis(string texto)
                 this.Invoke(new MethodInvoker(delegate { BtnBajarCorreos.Enabled = true; }));
                 this.Invoke(new MethodInvoker(delegate { LblMensaje.Text = "Error: " + ex.Message.ToString(); }));
                 Int32 segundosSleepErrorEmail = Convert.ToInt32(ConfigurationManager.AppSettings["SegundosSleepErrorEmail"]) * 1000;
-                System.Threading.Thread.Sleep(segundosSleepErrorEmail);
-                //  LblMensaje.Text = "Error: " + ex.Message.ToString();
-                // MessageBox.Show("Error: " + ex.Message, "", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                await Task.Delay(segundosSleepErrorEmail);
             }
             finally
             {
@@ -1092,6 +1022,50 @@ private static string LimpiarEmojis(string texto)
             //número de elementos afectados, etc.. de manera sencilla y segura
             //al hilo principal
         }
+        private static bool EsErrorDeTransporte(Exception ex)
+        {
+            if (ex is SocketException || ex is MailServerException)
+                return true;
+            return ex is IOException && ex.InnerException is SocketException;
+        }
+
+        private bool ReconectarCliente(MailClient oClient, MailServer oServer)
+        {
+            try
+            {
+                CerrarCliente(oClient);
+                oClient.Connect(oServer);
+                saveLOG("ReconectarCliente", DateTime.Now.ToString("ddMMyyyy"), "Reconexion exitosa con " + oServer.Server);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                saveLOG("ReconectarCliente", DateTime.Now.ToString("ddMMyyyy"), ex.ToString());
+                return false;
+            }
+        }
+
+        private void CerrarCliente(MailClient oClient)
+        {
+            if (oClient == null)
+                return;
+            try
+            {
+                oClient.Close();
+            }
+            catch
+            {
+            }
+        }
+
+        private async Task RegistrarError(Exception ex, CuentasEmail cuenta, MailServer oServer)
+        {
+            string usuario = cuenta?.UserName ?? "Desconocido";
+            string servidor = oServer?.Server ?? "Desconocido";
+            await SendErrorToAPI(ex, usuario, servidor);
+            await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), usuario + "@" + servidor + ": " + ex.ToString());
+        }
+
         static string _generateFileName(int sequence)
         {
             DateTime currentDateTime = DateTime.Now;

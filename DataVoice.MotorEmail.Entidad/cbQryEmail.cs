@@ -287,6 +287,8 @@ namespace DataVoice.MotorEmail.Entidad
                 cmdInsert.Parameters.AddWithValue("p_archivo_emailtxt", nuevoEmail.ArchivoEmailtxt);
                 cmdInsert.Parameters.AddWithValue("p_cuentaEmail", nuevoEmail.Cuenta);
                 cmdInsert.Parameters.AddWithValue("p_email_CC", nuevoEmail.ConCopia);
+                cmdInsert.Parameters.AddWithValue("p_FechaUltimoRegistro", nuevoEmail.FechaUltimoRegistro);
+
                 await cmdInsert.ExecuteNonQueryAsync();
             }
             catch (Exception ex)
@@ -337,7 +339,7 @@ namespace DataVoice.MotorEmail.Entidad
                 cmdInsert.Parameters.AddWithValue("p_pvCuenta", "");
                 cmdInsert.Parameters.AddWithValue("p_pvClaveUsuario", usuario);
                 cmdInsert.Parameters.AddWithValue("p_piVista", vista);
-                var rd = await cmdInsert.ExecuteReaderAsync();
+                var rd = await cmdInsert.ExecuteReaderAsync();                                                        
                 List<CuentasEmail> listaCuentasEmail = new List<CuentasEmail>();
                 while (await rd.ReadAsync())
                 {
@@ -370,10 +372,15 @@ namespace DataVoice.MotorEmail.Entidad
                     email.TenantId = rd["TenantId"].ToString();
                     email.Pop3 = Convert.ToBoolean(rd["Pop3"]);
                     email.AccessToken = rd["AccessToken"].ToString();
+                    email.FechaUltimoRegistro = rd["FechaUltimoRegistro"] == DBNull.Value
+                            ? (DateTime?)null
+                            : Convert.ToDateTime(rd["FechaUltimoRegistro"]);
+
                     if (!string.IsNullOrEmpty(rd["FechaToken"].ToString()))
                         email.FechaToken = Convert.ToDateTime(rd["FechaToken"]);
                     else
                         email.FechaToken = DateTime.Now;
+                   
 
                     listaCuentasEmail.Add(email);
                 }

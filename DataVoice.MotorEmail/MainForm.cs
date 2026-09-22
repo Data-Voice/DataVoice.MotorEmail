@@ -43,6 +43,8 @@ namespace DataVoice.MotorEmail
         {
             this.MaximizeBox = false;
             InitializeComponent();
+            BtnBajarCorreos.Enabled = false;
+            LblMensaje.Text = "Cargando cuentas...";
         }
 
         protected override async void OnLoad(EventArgs e)
@@ -65,10 +67,14 @@ namespace DataVoice.MotorEmail
                     }
                     cuentaEmail = cuenta.Usuario;
                 }
+                BtnBajarCorreos.Enabled = true;
+                LblMensaje.Text = "";
             }
             catch (Exception ex)
             {
                 await saveLOGAsync("Admin-1", DateTime.Now.ToString("ddMMyyyy"), "Error al cargar las cuentas: " + ex);
+                BtnBajarCorreos.Enabled = true;
+                LblMensaje.Text = "Error al cargar las cuentas";
             }
         }
 
@@ -756,8 +762,17 @@ private static string LimpiarEmojis(string texto)
 
                             foreach (var info in todos)
                             {
-                                Mail m = new Mail(LicenseCodeEAGetMail);
-                                m.Load(oClient.GetMailHeader(info));
+                                Mail m = null;
+                                try
+                                {
+                                    m = new Mail(LicenseCodeEAGetMail);
+                                    m.Load(oClient.GetMailHeader(info));
+                                }
+                                catch
+                                {
+                                    // Si el servidor no soporta la descarga de cabeceras, se mantiene el comportamiento anterior
+                                    m = oClient.GetMail(info);
+                                }
 
                                 if (m.ReceivedDate.ToLocalTime() >= fechaFiltro)
                                     filtrados.Add(info);

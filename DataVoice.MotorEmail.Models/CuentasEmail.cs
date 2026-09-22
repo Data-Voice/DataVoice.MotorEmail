@@ -25,6 +25,7 @@ namespace DataVoice.MotorEmail.Models
         public bool Pop3 { get; set; }
         public string AccessToken { get; set; }
         public DateTime FechaToken { get; set; }
+        public DateTime ? FechaUltimoRegistro { get; set; }
 
     }
 }
